@@ -1,0 +1,398 @@
+### 1. Auto-approve Small Claim
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+content-type: application/json
+
+{
+    "claim": {
+        "id": "C001",
+        "amount": 400,
+        "claimType": "Medical",
+        "policyId": "P001",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P001",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U001",
+        "active": true,
+        "deductible": 100
+    },
+    "documents": [
+        {
+            "id": "D001",
+            "type": "Invoice",
+            "ocrText": "Invoice for medical treatment",
+            "extractedAmount": 400,
+            "extractedDate": "2023-01-01"
+        },
+        {
+            "id": "D002",
+            "type": "Treatment Record",
+            "ocrText": "Treatment record for medical treatment"
+        }
+    ]
+}
+
+### 2. High Risk Large Claim
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+content-type: application/json
+
+{
+    "claim": {
+        "id": "C002",
+        "amount": 15000,
+        "claimType": "Accident",
+        "policyId": "P002",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P002",
+        "type": "Auto",
+        "limit": 20000,
+        "customerId": "U002",
+        "active": true,
+        "deductible": 100
+    }
+}
+
+### 3. Reject Limit Exceeded
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C003",
+        "amount": 6000,
+        "claimType": "Medical",
+        "policyId": "P003",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P003",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U003",
+        "active": true,
+        "deductible": 100
+    }
+}
+
+### 4. Reject Inactive Policy
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C004",
+        "amount": 1000,
+        "claimType": "Medical",
+        "policyId": "P004",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P004",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U004",
+        "active": false,
+        "deductible": 100
+    }
+}
+
+### 5. Reject Deductible Not Met
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C005",
+        "amount": 50,
+        "claimType": "Medical",
+        "policyId": "P005",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P005",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U005",
+        "active": true,
+        "deductible": 100
+    }
+}
+
+### 6. High Risk (Frequent Claimant)
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C006",
+        "amount": 1000,
+        "claimType": "Medical",
+        "policyId": "P006",
+        "status": "PENDING",
+        "previousClaimsCount": 5
+    },
+    "policy": {
+        "id": "P006",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U006",
+        "active": true,
+        "deductible": 100
+    },
+    "documents": [
+        {
+            "type": "Invoice",
+            "ocrText": "Invoice for medical treatment",
+            "extractedAmount": 1000,
+            "extractedDate": "2023-01-01"
+        }
+    ],
+    "claimHistory": {
+        "customerId": "U006",
+        "claimCountLast3Years": 5,
+        "totalClaimAmountLast3Years": 5000,
+        "previousClaimTypes": ["Medical", "Medical", "Medical", "Medical", "Medical"]
+    }
+}
+
+### 7. High Risk (Theft)
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C007",
+        "amount": 1000,
+        "claimType": "Theft",
+        "policyId": "P007",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P007",
+        "type": "Home",
+        "limit": 5000,
+        "customerId": "U007",
+        "active": true,
+        "deductible": 100
+    }
+}
+
+### 8. Conflict Resolution (High Risk but Rejected)
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C008",
+        "amount": 60000,
+        "claimType": "Medical",
+        "policyId": "P008",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P008",
+        "type": "Health",
+        "limit": 50000,
+        "customerId": "U008",
+        "active": true,
+        "deductible": 100
+    }
+}
+
+### 9. Discrepancy Check (Invoice Mismatch)
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C009",
+        "amount": 1000,
+        "claimType": "Medical",
+        "policyId": "P009",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P009",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U009",
+        "active": true,
+        "deductible": 100
+    },
+    "documents": [
+        {
+            "id": "D001",
+            "type": "Invoice",
+            "ocrText": "Invoice for medical treatment",
+            "extractedAmount": 500,
+            "extractedDate": "2023-01-01"
+        },
+        {
+            "id": "D002",
+            "type": "Treatment Record",
+            "ocrText": "Treatment record for medical treatment"
+        }
+    ]
+}
+
+### 10. Fraud Check (Suspicious Keywords)
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C010",
+        "amount": 2000,
+        "claimType": "Theft",
+        "policyId": "P010",
+        "status": "PENDING",
+        "comment": "My item was stolen and unexplained disappearance"
+    },
+    "policy": {
+        "id": "P010",
+        "type": "Home",
+        "limit": 5000,
+        "customerId": "U010",
+        "active": true,
+        "deductible": 100
+    }
+}
+
+### 11. Travel Claim Missing Ticket
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C011",
+        "amount": 200,
+        "claimType": "Lost Baggage",
+        "policyId": "P011",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P011",
+        "type": "Travel",
+        "limit": 5000,
+        "customerId": "U011",
+        "active": true,
+        "deductible": 50
+    },
+    "documents": []
+}
+
+### 12. Travel Claim With Ticket
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C012",
+        "amount": 200,
+        "claimType": "Lost Baggage",
+        "policyId": "P012",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P012",
+        "type": "Travel",
+        "limit": 5000,
+        "customerId": "U012",
+        "active": true,
+        "deductible": 50
+    },
+    "documents": [
+        {
+            "id": "D001",
+            "type": "Ticket",
+            "ocrText": "Flight 123",
+            "confidenceScore": 0.99
+        }
+    ]
+}
+
+### 13. Medical Claim Missing Documents
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C014",
+        "amount": 500,
+        "claimType": "Medical",
+        "policyId": "P014",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P014",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U014",
+        "active": true,
+        "deductible": 100
+    },
+    "documents": [
+        {
+            "id": "D002",
+            "type": "Invoice",
+            "ocrText": "Invoice #123",
+            "confidenceScore": 0.99,
+            "extractedAmount": 500.0
+        }
+    ]
+}
+
+### 14. Medical Claim With All Documents
+
+POST http://localhost:8080/api/claims/process HTTP/1.1
+Content-Type: application/json
+
+{
+    "claim": {
+        "id": "C015",
+        "amount": 500,
+        "claimType": "Medical",
+        "policyId": "P015",
+        "status": "PENDING"
+    },
+    "policy": {
+        "id": "P015",
+        "type": "Health",
+        "limit": 5000,
+        "customerId": "U015",
+        "active": true,
+        "deductible": 100
+    },
+    "documents": [
+        {
+            "id": "D003",
+            "type": "Invoice",
+            "ocrText": "Invoice #123",
+            "confidenceScore": 0.99,
+            "extractedAmount": 500.0
+        },
+        {
+            "id": "D004",
+            "type": "Treatment Record",
+            "ocrText": "Treatment details...",
+            "confidenceScore": 0.95
+        }
+    ]
+}

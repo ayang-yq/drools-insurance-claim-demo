@@ -1,0 +1,11 @@
+com\example\drools\model\Discrepancy.class
+com\example\drools\controller\ClaimController.class
+com\example\drools\model\ClaimHistory.class
+com\example\drools\model\Policy.class
+com\example\drools\model\Document.class
+com\example\drools\service\ClaimService.class
+com\example\drools\service\DocumentVerificationService.class
+com\example\drools\config\KieConfig.class
+com\example\drools\DroolsDemoApplication.class
+com\example\drools\controller\ClaimController$ClaimRequest.class
+com\example\drools\model\Claim.class
