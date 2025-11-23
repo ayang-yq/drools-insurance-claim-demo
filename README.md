@@ -1,121 +1,136 @@
-# Drools Insurance Demo
+# Drools Insurance Claim Demo
 
-This project demonstrates a simple Insurance Claim handling system using **Spring Boot** and **Drools**.
+This repository demonstrates a small insurance claim processing demo built with Spring Boot and Drools (KIE). It shows how business rules can be used to validate claims, calculate risk, and decide approval vs investigation vs rejection.
 
-## Project Structure
+## Highlights
 
-- **Domain Models**: `Claim`, `Policy`
-- **Drools Config**: `KieConfig` loads rules from `src/main/resources/rules/insurance-rules.drl`
-- **Rules**:
-    1. **Validation Rules** (Highest Priority):
-        - **Inactive Policy**: Rejects claims if the policy is not active.
-        - **Policy Limit Exceeded**: Rejects claims if the amount exceeds the policy limit.
-        - **Deductible Check**: Rejects claims if the amount is less than the deductible.
-    2. **Risk Calculation Rules** (Medium Priority):
-        - **Large Claims**: Adds 50 risk points for claims over $10,000.
-        - **Frequent Claimant**: Adds 30 risk points if previous claims count > 3.
-        - **Theft Claims**: Adds 20 risk points for "Theft" type claims.
-    3. **Decision Rules** (Lowest Priority):
-        - **Auto-approval**: Approves claims with Risk Score <= 20.
-        - **Investigation Required**: Flags claims with Risk Score > 20 for investigation.
-- **Service**: `ClaimService` executes the rules.
-- **Controller**: `ClaimController` exposes a REST endpoint.
+- Spring Boot application that loads Drools rules from `src/main/resources/rules/insurance-rules.drl` via `KieConfig`.
+- Main service is `ClaimService` which creates a KIE session, inserts facts (Claim, Policy, ClaimHistory, Discrepancy, Documents) and fires rules.
+- A lightweight `DocumentVerificationService` simulates OCR-based verification and produces `Discrepancy` facts for the rules to act upon.
+- REST endpoint: POST `/api/claims/process` handled by `ClaimController`.
 
-## Prerequisites
+## Tech stack
 
 - Java 17
+- Spring Boot 3.x
+- Drools / KIE (configured to use Drools version defined in `pom.xml`)
 - Maven
 
-## How to Run
+## Project layout (important files)
 
-1.  Clone the repository (or use the provided project folder).
-2.  Navigate to the project directory:
-    ```bash
-    cd drools-insurance-demo
-    ```
-3.  Run the application:
-    ```bash
-    mvn spring-boot:run
-    ```
+- `src/main/java/com/example/drools/DroolsDemoApplication.java` — Spring Boot entry point
+- `src/main/java/com/example/drools/config/KieConfig.java` — KIE container initialization
+- `src/main/java/com/example/drools/controller/ClaimController.java` — REST controller with `/api/claims/process`
+- `src/main/java/com/example/drools/service/ClaimService.java` — orchestrates Drools session and rule execution
+- `src/main/java/com/example/drools/service/DocumentVerificationService.java` — mock OCR verification
+- `src/main/resources/rules/insurance-rules.drl` — Drools rules
+- `src/main/java/com/example/drools/model/*` — domain models: `Claim`, `Policy`, `ClaimHistory`, `Document`, `Discrepancy`
+- `src/test/java/.../ClaimServiceTest.java` — unit tests covering common scenarios
 
-## How to Test
+## Models (summary)
 
-You can test the rules using `curl` or any API client (like Postman).
+- Claim (fields used): `id`, `amount`, `claimType`, `policyId`, `status` (default "PENDING"), `riskScore`, `comment`, `providedDocuments`, `firedRules`, `previousClaimsCount`, `incidentDate`.
+- Policy: `id`, `type`, `limit`, `deductible`, `active`.
 
-### 1. Auto-approve Small Claim
+## How to build
 
-**Request:**
-```bash
-curl -X POST http://localhost:8080/api/claims/process \
--H "Content-Type: application/json" \
--d '{
-    "claim": {
-        "id": "C001",
-        "amount": 400,
-        "claimType": "Medical",
-        "policyId": "P001",
-        "status": "PENDING"
-    },
-    "policy": {
-        "id": "P001",
-        "type": "Health",
-        "limit": 5000,
-        "customerId": "U001"
-    }
+You need Java 17 and Maven installed.
+
+From project root:
+
+```powershell
+mvn clean package
+```
+
+To run the app:
+
+```powershell
+mvn spring-boot:run
+```
+
+Alternatively run the generated jar:
+
+```powershell
+java -jar target\drools-insurance-claim-demo-0.0.1-SNAPSHOT.jar
+```
+
+## API: process claim
+
+POST /api/claims/process
+
+Content-Type: application/json
+
+Request body shape (JSON):
+
+{
+  "claim": { ... },
+  "policy": { ... },
+  "documents": [ ... ],         // optional
+  "claimHistory": { ... }      // optional
+}
+
+Minimal example (curl / PowerShell):
+
+```powershell
+curl -X POST "http://localhost:8080/api/claims/process" -H "Content-Type: application/json" -d '{
+  "claim": {
+    "id": "C001",
+    "amount": 400,
+    "claimType": "General",
+    "policyId": "P001",
+    "status": "PENDING"
+  },
+  "policy": {
+    "id": "P001",
+    "type": "Health",
+    "limit": 5000,
+    "deductible": 100,
+    "active": true
+  }
 }'
 ```
 
-**Expected Response:**
-Status should be `APPROVED`, Risk Score `0`.
+Typical responses: the returned `Claim` object will have updated `status` (e.g. `APPROVED`, `REJECTED`, `INVESTIGATION_REQUIRED`), `comment` and `riskScore` depending on rule evaluation.
 
-### 2. High Risk Large Claim
+## Rules overview
 
-**Request:**
-```bash
-curl -X POST http://localhost:8080/api/claims/process \
--H "Content-Type: application/json" \
--d '{
-    "claim": {
-        "id": "C002",
-        "amount": 15000,
-        "claimType": "Accident",
-        "policyId": "P002",
-        "status": "PENDING"
-    },
-    "policy": {
-        "id": "P002",
-        "type": "Auto",
-        "limit": 20000,
-        "customerId": "U002"
-    }
-}'
+Rules are implemented in `insurance-rules.drl`. Key groups:
+
+- Validation rules (high salience): reject when policy inactive, limit exceeded, missing required documents, or amount < deductible.
+- Discrepancy handling: when a `Discrepancy` fact exists, the claim is flagged for investigation.
+- Risk calculation (medium salience): rules add to `riskScore` for large claims, theft claims, frequent claimants, and suspicious keywords.
+- Decision rules (low salience): auto-approve low risk (<= 20) or require investigation when risk > 20.
+
+Salience controls order and lets validation/rejection take precedence over decision rules.
+
+## Tests
+
+Unit tests are under `src/test/java` and cover scenarios such as inactive policy rejection, deductible rejection, low-risk approval, high-risk investigation, multiple risk factors, and conflict resolution.
+
+Run tests with:
+
+```powershell
+mvn test
 ```
 
-**Expected Response:**
-Risk Score should be `100`.
+The project currently includes a test class `ClaimServiceTest` exercising the main rule flows.
 
-### 3. Reject Limit Exceeded
+## Extending the demo
 
-**Request:**
-```bash
-curl -X POST http://localhost:8080/api/claims/process \
--H "Content-Type: application/json" \
--d '{
-    "claim": {
-        "id": "C003",
-        "amount": 6000,
-        "claimType": "Medical",
-        "policyId": "P003",
-        "status": "PENDING"
-    },
-    "policy": {
-        "id": "P003",
-        "type": "Health",
-        "limit": 5000,
-        "customerId": "U003"
-    }
-}'
-```
+- Add or modify rules in `src/main/resources/rules/insurance-rules.drl`. KIE will pick them up on build/start.
+- Implement a real `DocumentVerificationService` to call an OCR provider and convert results into `Discrepancy` facts.
+- Add integration tests that call the REST endpoint and assert end-to-end behavior.
 
-**Expected Response:**
-Status should be `REJECTED`.
+## Notes and gotchas
+
+- The `DocumentVerificationService` is a mock and should be replaced for production.
+- Rules rely on certain field names (see models). Changing model property names requires updating DRL accordingly.
+- Drools uses object equality semantics in the DRL; ensure objects are correctly inserted into the KIE session.
+
+## Contact / License
+
+This is a demo repository. See project root for license (if any) or add one as needed.
+
+---
+
+If you want, I can also add a short example Postman collection or expand the README with generated example responses.
